@@ -66,15 +66,15 @@ impl<T: Clone + std::fmt::Debug> Queue<T> {
         }
     }
 
-    pub fn enqueue(&mut self, value_in: T) {
+    pub fn enqueue(&mut self, item: T) {
         self.length += 1;
         match &self.ptr {
             QueuePtr::Empty => {
-                self.ptr = QueuePtr::Unit { value: value_in };
+                self.ptr = QueuePtr::Unit { value: item };
             }
 
             QueuePtr::Unit { value } => {
-                let tail: *mut QNode<T> = Box::into_raw(Box::new(QNode::Tail { value: value_in }));
+                let tail: *mut QNode<T> = Box::into_raw(Box::new(QNode::Tail { value: item }));
                 self.ptr = QueuePtr::Multi {
                     head_value: value.clone(),
                     head_next: tail,
@@ -87,8 +87,7 @@ impl<T: Clone + std::fmt::Debug> Queue<T> {
                 head_next,
                 tail,
             } => {
-                let new_tail: *mut QNode<T> =
-                    Box::into_raw(Box::new(QNode::Tail { value: value_in }));
+                let new_tail: *mut QNode<T> = Box::into_raw(Box::new(QNode::Tail { value: item }));
                 let old_tail = QNode::Body {
                     value: unsafe { (**tail).value() },
                     next: new_tail,
