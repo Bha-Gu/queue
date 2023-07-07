@@ -29,8 +29,14 @@ where
     T: Clone + std::fmt::Debug,
 {
     Empty,
-    Unit { value: T },
-    Multi { head: QNode<T>, tail: *mut QNode<T> },
+    Unit {
+        value: T,
+    },
+    Multi {
+        head_value: T,
+        head_next: *mut QNode<T>,
+        tail: *mut QNode<T>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -69,14 +75,18 @@ impl<T: Clone + std::fmt::Debug> Queue<T> {
 
             QueuePtr::Unit { value } => {
                 let tail: *mut QNode<T> = Box::into_raw(Box::new(QNode::Tail { value: value_in }));
-                let head: QNode<T> = QNode::Body {
-                    value: value.clone(),
-                    next: tail,
-                };
-                self.ptr = QueuePtr::Multi { head, tail }
+                self.ptr = QueuePtr::Multi {
+                    head_value: value.clone(),
+                    head_next: tail,
+                    tail,
+                }
             }
 
-            QueuePtr::Multi { head, tail } => {
+            QueuePtr::Multi {
+                head_value,
+                head_next,
+                tail,
+            } => {
                 let new_tail: *mut QNode<T> =
                     Box::into_raw(Box::new(QNode::Tail { value: value_in }));
                 let old_tail = QNode::Body {
@@ -87,7 +97,8 @@ impl<T: Clone + std::fmt::Debug> Queue<T> {
                     (**tail) = old_tail;
                 }
                 self.ptr = QueuePtr::Multi {
-                    head: head.clone(),
+                    head_value: head_value.clone(),
+                    head_next: *head_next,
                     tail: new_tail,
                 };
             }
@@ -106,27 +117,33 @@ impl<T: Clone + std::fmt::Debug> Queue<T> {
                 out
             }
 
-            QueuePtr::Multi { head, tail } => {
+            QueuePtr::Multi {
+                head_value,
+                head_next,
+                tail,
+            } => {
                 self.length -= 1;
-                let cloned_head = (*head).clone();
-                let new_head = cloned_head.next()?;
+                let cloned_head = (head_value).clone();
+                let new_head = *head_next;
                 self.ptr = if self.length == 1 {
                     unsafe {
                         drop(Box::from_raw(new_head));
                     }
                     QueuePtr::Unit {
-                        value: cloned_head.value(),
+                        value: head_value.clone(),
                     }
                 } else if self.length == 0 {
                     println!("{new_head:?}0");
                     QueuePtr::Empty
                 } else {
+                    let next_head = unsafe { *Box::from_raw(new_head) };
                     QueuePtr::Multi {
-                        head: unsafe { *Box::from_raw(new_head) },
+                        head_value: next_head.value(),
+                        head_next: next_head.next()?,
                         tail: *tail,
                     }
                 };
-                Some(cloned_head.value())
+                Some(cloned_head)
             }
         }
     }
@@ -137,7 +154,11 @@ impl<T: Clone + std::fmt::Debug> Queue<T> {
 
             QueuePtr::Unit { value } => Some(value.clone()),
 
-            QueuePtr::Multi { head, tail: _ } => Some((*head).value()),
+            QueuePtr::Multi {
+                head_value,
+                head_next: _,
+                tail: _,
+            } => Some((*head_value).clone()),
         }
     }
 }
